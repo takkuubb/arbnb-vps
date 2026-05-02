@@ -1,0 +1,5 @@
+const Database = require('/var/www/arbnb/node_modules/better-sqlite3');
+const db = new Database('/var/www/arbnb/arbnb.db');
+const r = db.prepare('SELECT payout_date FROM payouts ORDER BY payout_date DESC LIMIT 3').all();
+console.log(JSON.stringify(r));
+db.close();

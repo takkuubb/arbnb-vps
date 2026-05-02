@@ -1,0 +1,11 @@
+const Database = require('/var/www/arbnb/node_modules/better-sqlite3');
+const db = new Database('/var/www/arbnb/arbnb.db');
+const rows = db.prepare('SELECT reservation_code, guest_name, guests_total, guests_adult, guests_child, guests_infant FROM payouts WHERE guests_total IS NOT NULL AND guests_total > 0 LIMIT 10').all();
+console.log('With guest data:', JSON.stringify(rows, null, 2));
+const nullCount = db.prepare('SELECT COUNT(*) as c FROM payouts WHERE guests_total IS NULL OR guests_total = 0').get();
+const total = db.prepare('SELECT COUNT(*) as c FROM payouts').get();
+console.log('null/zero:', nullCount.c, '/ total:', total.c);
+const childCount = db.prepare('SELECT COUNT(*) as c FROM payouts WHERE guests_child > 0').get();
+const infantCount = db.prepare('SELECT COUNT(*) as c FROM payouts WHERE guests_infant > 0').get();
+console.log('with children:', childCount.c, '| with infants:', infantCount.c);
+db.close();

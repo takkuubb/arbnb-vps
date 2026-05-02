@@ -1,0 +1,427 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>arbnb - Dashboard</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,sans-serif;background:#f0f2f5;color:#333}
+header{background:white;border-bottom:1px solid #eee;padding:1rem 2rem;display:flex;justify-content:space-between;align-items:center}
+header h1{color:#FF5A5F;font-size:1.2rem}
+header h1 span{font-size:0.8rem;color:#888;font-weight:normal}
+.btn-logout{background:#f5f5f5;border:1px solid #ddd;color:#666;padding:0.5rem 1rem;border-radius:6px;cursor:pointer;font-size:0.85rem}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:1rem;padding:1.5rem 2rem}
+.stat-card{background:white;border-radius:12px;padding:1.2rem;box-shadow:0 1px 4px rgba(0,0,0,0.08);text-align:center}
+.stat-card .val{font-size:1.8rem;font-weight:700;color:#FF5A5F}
+.stat-card .lbl{font-size:0.75rem;color:#888;margin-top:4px;margin-bottom:8px}
+.stat-card .sub{font-size:0.7rem;color:#aaa}
+.bar{display:flex;align-items:center;gap:0.75rem;padding:0 2rem 1rem;flex-wrap:wrap}
+.search{flex:1;min-width:200px;padding:0.75rem 1rem;border:1px solid #ddd;border-radius:8px;font-size:0.9rem;outline:none}
+.search:focus{border-color:#FF5A5F}
+select{padding:0.6rem 0.8rem;border:1px solid #ddd;border-radius:8px;font-size:0.85rem;background:white;cursor:pointer}
+.btn{background:#FF5A5F;color:white;border:none;padding:0.6rem 1.2rem;border-radius:8px;font-size:0.85rem;cursor:pointer;font-weight:600}
+.btn:hover{background:#e04e4e}
+.btn-gray{background:#888;color:white;border:none;padding:0.6rem 1.2rem;border-radius:8px;font-size:0.85rem;cursor:pointer}
+.btn-add{background:white;color:#FF5A5F;border:2px solid #FF5A5F;padding:0.5rem 1rem;border-radius:8px;font-size:0.85rem;cursor:pointer;font-weight:700}
+.main{padding:0 2rem 2rem}
+table{width:100%;border-collapse:collapse;background:white;border-radius:12px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,0.08)}
+thead tr{background:#FF5A5F;color:white}
+th{padding:0.9rem 1rem;text-align:left;font-size:0.8rem;font-weight:600;cursor:pointer;user-select:none;white-space:nowrap}
+th:hover{background:rgba(255,255,255,0.15)}
+th .sort-icon{margin-left:4px;font-size:0.65rem;opacity:0.6}
+tbody tr{border-bottom:1px solid #f5f5f5}
+tbody tr:hover{background:#FFF8F8}
+td{padding:0.8rem 1rem;font-size:0.85rem;vertical-align:middle}
+td.amount{font-weight:600}
+td small{color:#888;font-size:0.78rem}
+td code{background:#f5f5f5;padding:2px 6px;border-radius:4px;font-size:0.8rem}
+td .sub{color:#888;font-size:0.75rem}
+td .badge{background:#f0e8ff;color:#6b21a8;padding:3px 8px;border-radius:12px;font-size:0.75rem;font-weight:600}
+td .night-tag{background:#e0f2fe;color:#0369a1;padding:3px 8px;border-radius:12px;font-size:0.75rem;font-weight:600}
+.empty{text-align:center;padding:4rem;color:#aaa;background:white;border-radius:12px}
+.empty-icon{font-size:3rem;margin-bottom:0.5rem}
+#loading{text-align:center;padding:3rem;color:#aaa}
+.footer{padding:1rem 2rem;text-align:center;color:#aaa;font-size:0.75rem}
+@media(max-width:768px){.stats{grid-template-columns:1fr 1fr}.main{padding:0 1rem 1rem}th:nth-child(5),td:nth-child(5){display:none}}
+</style>
+</head>
+<body>
+<header>
+  <h1>🏠 arbnb <span>/ Airbnb 配当管理</span></h1>
+  <button class="btn-logout" onclick="logout()">ログアウト</button>
+</header>
+<div class="stats">
+  <div class="stat-card"><div class="val" id="s-total">—</div><div class="lbl">合計件数</div><div class="sub" id="s-monthly-count">今月 — 件</div></div>
+  <div class="stat-card"><div class="val" id="s-monthly">—</div><div class="lbl">今月合計金額</div><div class="sub" id="s-avg">平均 — /泊</div></div>
+  <div class="stat-card"><div class="val" id="s-avg-night">—</div><div class="lbl">平均1泊金額</div><div class="sub" id="s-count-month">今月 — 件</div></div>
+  <div class="stat-card"><div class="val" id="s-total-guests">—</div><div class="lbl">合計ゲスト数</div><div class="sub" id="s-avg-adults">平均 — 人/組</div></div>
+</div>
+<div class="bar">
+  <input class="search" id="search" placeholder="ゲスト名・リスティング・予約番号" oninput="debouncedLoad()">
+  <select id="sort" onchange="load()">
+    <option value="payout_date_desc">支払日順（新しい順）</option>
+    <option value="amount_value_desc">金額多い順</option>
+    <option value="guest_name_asc">ゲスト名順</option>
+    <option value="nights_desc">泊数多い順</option>
+    <option value="stay_start_desc">チェックイン順</option>
+  </select>
+  <select id="filter" onchange="load()">
+    <option value="">すべて</option>
+    <option value="this_month">今月</option>
+    <option value="last_month">先月</option>
+  </select>
+  <button class="btn-add" onclick="openAdd()">＋手動追加</button>
+  <button class="btn-gray" onclick="openScan()">📧 Gmail取込</button>
+  <button class="btn-gray" onclick="runScanGuests()">👥 Guest数取得</button>
+</div>
+<div class="main">
+  <div id="loading">読み込み中...</div>
+  <div id="empty" class="empty" style="display:none"><div class="empty-icon">📭</div><div>データがありません</div></div>
+  <table id="table" style="display:none">
+    <thead><tr>
+      <th onclick="setSort('guest_name')">ゲスト名 <span class="sort-icon">↕</span></th>
+      <th onclick="setSort('guests_adult')">大人</th>
+      <th onclick="setSort('guests_child')">子供</th>
+      <th onclick="setSort('guests_infant')">幼児</th>
+      <th onclick="setSort('guests_total')">合計</th>
+      <th onclick="setSort('nationality')">国籍 <span class="sort-icon">↕</span></th>
+      <th onclick="setSort('nights')">泊数 <span class="sort-icon">↕</span></th>
+      <th>宿泊期間</th>
+      <th onclick="setSort('listing_title')">リスティング <span class="sort-icon">↕</span></th>
+      <th>予約番号</th>
+      <th onclick="setSort('amount_per_night')">1泊/金額 <span class="sort-icon">↕</span></th>
+      <th onclick="setSort('payout_date')">支払日 <span class="sort-icon">↕</span></th>
+    </tr></thead>
+    <tbody id="tbody"></tbody>
+  </table>
+</div>
+<div id="scan-modal" class="modal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:100;justify-content:center;align-items:center">
+  <div style="background:white;border-radius:16px;padding:2rem;max-width:420px;width:90%;text-align:center">
+    <div style="font-size:2rem;margin-bottom:1rem">📧</div>
+    <div style="font-size:1.1rem;font-weight:700;margin-bottom:0.5rem">Gmail取込</div>
+    <div style="color:#888;font-size:0.85rem;margin-bottom:1.5rem">Airbnb payout通知メールを自動解析</div>
+    <div id="scan-status" style="margin-bottom:1.5rem;font-size:0.9rem;color:#FF5A5F;font-weight:600">準備中...</div>
+    <div id="scan-detail" style="color:#aaa;font-size:0.8rem;margin-bottom:1.5rem"></div>
+    <div style="display:flex;gap:0.75rem;justify-content:center">
+      <button class="btn" onclick="runScan()" id="scan-btn">実行する</button>
+      <button class="btn-gray" onclick="closeScan()">閉じる</button>
+    </div>
+  </div>
+</div>
+<div id="add-modal" class="modal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:100;justify-content:center;align-items:center">
+  <div style="background:white;border-radius:16px;padding:2rem;max-width:480px;width:90%;max-height:90vh;overflow-y:auto">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.5rem">
+      <div style="font-size:1.1rem;font-weight:700">手動で追加</div>
+      <div style="cursor:pointer;font-size:1.5rem;color:#aaa" onclick="closeAdd()">×</div>
+    </div>
+    <div id="add-error" style="background:#fff0f0;color:#c0392b;padding:0.75rem;border-radius:8px;font-size:0.85rem;margin-bottom:1rem;display:none"></div>
+    <form id="add-form" onsubmit="submitAdd(event)">
+      <div class="fg"><label>ゲスト名 *</label><input name="guest_name" required></div>
+      <div class="fg"><label>国籍</label><input name="nationality" placeholder="例: Japan"></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem">
+        <div class="fg"><label>チェックイン *</label><input name="stay_start" type="date" required></div>
+        <div class="fg"><label>チェックアウト *</label><input name="stay_end" type="date" required></div>
+      </div>
+      <div class="fg"><label>リスティング</label><input name="listing_title" placeholder="例: Luxury Condo in Shibuya"></div>
+      <div class="fg"><label>予約番号 *</label><input name="reservation_code" placeholder="例: HX4ABC123" required></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem">
+        <div class="fg"><label>支払金額 (JPY)</label><input name="amount_value" type="number" placeholder="例: 102339"></div>
+        <div class="fg"><label>支払日 *</label><input name="payout_date" type="date" required></div>
+      </div>
+      <div style="display:flex;gap:0.75rem;margin-top:1.5rem">
+        <button type="submit" class="btn" id="add-btn">追加する</button>
+        <button type="button" class="btn-gray" onclick="closeAdd()">キャンセル</button>
+      </div>
+    </form>
+  </div>
+</div>
+<style>
+.fg{margin-bottom:1rem}
+.fg label{display:block;font-size:0.78rem;color:#666;margin-bottom:4px;font-weight:600}
+.fg input{width:100%;padding:0.6rem 0.8rem;border:1px solid #ddd;border-radius:8px;font-size:0.9rem;outline:none}
+.fg input:focus{border-color:#FF5A5F}
+</style>
+<script>
+(function() {
+  var token = localStorage.getItem('arbnb_token');
+  if (!token) { window.location.href = '/arbnb/login.html'; return; }
+  var authHeader = 'Bearer ' + token;
+
+  function api(path, options) {
+    return fetch(path, Object.assign({
+      method: 'GET',
+      headers: { 'Authorization': authHeader, 'Content-Type': 'application/json' }
+    }, options || {}));
+  }
+
+  function esc(s) {
+    if (s == null) return '';
+    return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+  function fmtYen(v) {
+    if (v == null) return '<span class="sub">—</span>';
+    return '¥' + Number(v).toLocaleString('ja-JP');
+  }
+  function fmtDate(d) {
+    if (!d) return '<span class="sub">—</span>';
+    return new Date(d).toLocaleDateString('ja-JP', {year:'numeric',month:'2-digit',day:'2-digit'});
+  }
+  function fmtStay(s, e) {
+    if (!s && !e) return '<span class="sub">—</span>';
+    var f = {month:'2-digit',day:'2-digit'};
+    var ss = s ? new Date(s).toLocaleDateString('ja-JP', f) : '?';
+    var es = e ? new Date(e).toLocaleDateString('ja-JP', f) : '?';
+    return ss + ' → ' + es;
+  }
+  function setSort(col) {
+    var sel = document.getElementById('sort');
+    sel.value = sel.value === col ? col + '_desc' : col;
+    load();
+  }
+  function logout() { localStorage.removeItem('arbnb_token'); window.location.href = '/arbnb/login.html'; }
+  var debounceTimer = null;
+  function debouncedLoad() { clearTimeout(debounceTimer); debounceTimer = setTimeout(load, 400); }
+
+  function load() {
+    var search = document.getElementById('search').value.trim();
+    var sort = document.getElementById('sort').value;
+    var filter = document.getElementById('filter').value;
+    var url = '/arbnb/api/payouts?limit=500';
+    if (search) url += '&search=' + encodeURIComponent(search);
+    if (sort) url += '&sort=' + encodeURIComponent(sort);
+    if (filter) url += '&filter=' + encodeURIComponent(filter);
+    // DEBUG: log actual URL + first result
+    console.log('LOAD URL:', url);
+    api(url).then(function(res) { return res.json(); }).then(function(data) {
+      if (data.payouts && data.payouts.length > 0) {
+        console.log('FIRST:', data.payouts[0].guest_name, '¥' + data.payouts[0].amount_value, 'nat:', data.payouts[0].nationality, 'g:', data.payouts[0].guests_total);
+      }
+    }).catch(function(e) { console.error('API ERR:', e.message); });
+    document.getElementById('loading').style.display = 'block';
+    document.getElementById('table').style.display = 'none';
+    document.getElementById('empty').style.display = 'none';
+    api(url).then(function(res) { return res.json(); })
+      .then(function(data) {
+        document.getElementById('loading').style.display = 'none';
+        if (!data.payouts || data.payouts.length === 0) {
+          document.getElementById('empty').style.display = 'block';
+          updateStats([]); return;
+        }
+        document.getElementById('table').style.display = 'table';
+        render(data.payouts);
+        updateStats(data.payouts);
+      })
+      .catch(function(err) {
+        document.getElementById('loading').textContent = 'エラー: ' + err.message;
+        console.error(err);
+      });
+  }
+
+  function detectNationality(name) {
+    if (!name) return null;
+    // CJK scripts
+    if (/[\u3040-\u309f\u30a0-\u30ff]/.test(name)) return 'Japan';
+    if (/[\u4e00-\u9fff]/.test(name)) return 'China';
+    if (/[가-힯]/.test(name)) return 'Korea';
+    if (/[฀-๿]/.test(name)) return 'Thailand';
+    if (/[\uac00-\ud7af]/.test(name)) return 'Korea';
+    // Western first name patterns
+    var first = (name.split(/[\s,]+/)[0] || '').toLowerCase();
+    // French
+    if (/\b(olivier|claire|sophie|nicolas|antoine|jean|pierre|marie|claude|philippe|bernard|thomas|patrick|stephanie|cecile|alexandre|guillaume|margot|amelie|charlotte|julien|francois|laurent|sylvie|emilie|romain|luc|dominique|mathieu|pascale)\b/i.test(first)) return 'France';
+    // German
+    if (/\b(hans|klaus|werner|friedrich|helmut|ulrich|stephan|martin|christian|jorg|andreas|alexander|peter|frank|robert|erik|marc|arnold|johan|dirk)\b/i.test(first)) return 'Germany';
+    // Italian
+    if (/\b(marco|luigi|francesca|giulia|sara|alessandro|matteo|fabio|andrea|eleonora|paolo|massimo|roberta|chiara|giovanni|valentina|simona|renato|giuseppe|stefano|federico|luca)\b/i.test(first)) return 'Italy';
+    // Spanish
+    if (/\b(juan|carlos|miguel|ana|maria|isabel|diego|lucia|fernando|joseluis|manuel|antonio|pedro|laura|carmen|rosa|angeles|belen|pablo|lorena|beatriz)\b/i.test(first)) return 'Spain';
+    // Portuguese
+    if (/\b(pedro|joao|ana|maria|tiago|filipa|ricardo|paulo|sara|nelson|diogo|margarida|andre|bruno|susana)\b/i.test(first)) return 'Portugal';
+    // Dutch
+    if (/\b(jan|wim|peter|karel|dirk|arnold|hans|johan|erik|marc|eddy|bart|koen|thijs|sander|rex|rick|maarten)\b/i.test(first)) return 'Netherlands';
+    // Scandinavian
+    if (/\b(lars|anders|erik|kristian|mats|per|gunnar|stefan|joakim|ivar|ola|lucas|felix|hugo|otto|nils|magnus|kenneth)\b/i.test(first)) return 'Scandinavia';
+    // English/American
+    if (/\b(john|michael|david|robert|james|william|richard|charles|joseph|thomas|christopher|daniel|matthew|anthony|mark|steven|paul|andrew|joshua|ryan|oliver|harry|jack|george|edward|brian|ian|emma|sarah|hannah|lucy|amy|grace|josephine)\b/i.test(first)) return 'UK';
+    // Specific known names
+    if (/\b(olivier|bess|joseph|charles|georges|henri|leon|sebastien|florent|vincent)\b/i.test(first)) return 'France';
+    if (/\b(yuki|sora|haruka|ren|ken|akira|takeshi|masahiro|shota)\b/i.test(first)) return 'Japan';
+    return null;
+  }
+
+  function render(payouts) {
+    var tbody = document.getElementById('tbody');
+    tbody.innerHTML = payouts.map(function(p) {
+      var nights = p.nights || 0;
+      var amountPerNight = p.amount_per_night;
+      var amountVal = Number(p.amount_value || 0);
+      var amountHtml;
+      if (amountPerNight) {
+        amountHtml = fmtYen(amountPerNight) + '<span class="sub"> ×' + nights + '泊</span><div style="font-size:0.72rem;color:#888;margin-top:2px">' + fmtYen(amountVal) + '</div>';
+      } else {
+        amountHtml = '<span class="sub">¥' + amountVal.toLocaleString('ja-JP') + '</span>';
+      }
+      return '<tr>' +
+        '<td>' + esc(p.guest_name) + '</td>' +
+        '<td>' + (p.guests_adult ? '<span class="night-tag">' + p.guests_adult + '</span>' : '<span class="sub">—</span>') + '</td>' +
+        '<td>' + (p.guests_child ? '<span style="background:#bfdbfe;color:#1d4ed8;padding:3px 8px;border-radius:12px;font-size:0.75rem;font-weight:600">' + p.guests_child + '</span>' : '<span class="sub">—</span>') + '</td>' +
+        '<td>' + (p.guests_infant ? '<span style="background:#fef3c7;color:#d97706;padding:3px 8px;border-radius:12px;font-size:0.75rem;font-weight:600">' + p.guests_infant + '</span>' : '<span class="sub">—</span>') + '</td>' +
+        '<td>' + ((p.guests_total || p.guests_adult) ? '<span class="night-tag" style="background:#f3e8ff;color:#7c3aed;font-weight:700">' + (p.guests_total || p.guests_adult) + '</span>' : '<span class="sub">—</span>') + '</td>' +
+        '<td>' + (function() {
+          if (p.nationality) return '<span class="badge">' + esc(p.nationality) + '</span>';
+          var est = detectNationality(p.guest_name || '');
+          if (est) return '<span class="badge" style="background:#e0f2fe;color:#0369a1">推定:' + esc(est) + '</span>';
+          return '<span class="sub">—</span>';
+        }()) + '</td>' +
+        '<td>' + (p.nights ? '<span class="night-tag">' + p.nights + '泊</span>' : '<span class="sub">—</span>') + '</td>' +
+        '<td><small>' + fmtStay(p.stay_start, p.stay_end) + '</small></td>' +
+        '<td><small>' + esc(p.listing_title || '').substring(0, 50) + '</small></td>' +
+        '<td><code>' + esc(p.reservation_code) + '</code></td>' +
+        '<td class="amount">' + amountHtml + '</td>' +
+        '<td><small>' + fmtDate(p.payout_date) + '</small></td>' +
+        '</tr>';
+    }).join('');
+  }
+
+  function updateStats(payouts) {
+    var now = new Date();
+    var thisMonth = payouts.filter(function(p) {
+      if (!p.payout_date) return false;
+      var d = new Date(p.payout_date);
+      return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth();
+    });
+    var monthly = thisMonth.reduce(function(s, p) { return s + Number(p.amount_value || 0); }, 0);
+    document.getElementById('s-total').textContent = payouts.length + '件';
+    document.getElementById('s-monthly').textContent = '¥' + monthly.toLocaleString('ja-JP');
+    document.getElementById('s-monthly-count').textContent = '今月 ' + thisMonth.length + '件';
+    var nightsWithData = payouts.filter(function(p) { return p.amount_per_night; });
+    var avg = nightsWithData.length > 0 ? Math.round(nightsWithData.reduce(function(s, p) { return s + Number(p.amount_per_night); }, 0) / nightsWithData.length) : 0;
+    document.getElementById('s-avg-night').textContent = '¥' + avg.toLocaleString('ja-JP');
+    document.getElementById('s-avg').textContent = '平均 ¥' + Math.round(monthly / (thisMonth.length || 1)).toLocaleString('ja-JP') + ' /泊';
+    var lastMonth = payouts.filter(function(p) {
+      if (!p.payout_date) return false;
+      var d = new Date(p.payout_date);
+      var lm = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+      return d.getFullYear() === lm.getFullYear() && d.getMonth() === lm.getMonth();
+    });
+    document.getElementById('s-count-month').textContent = '先月 ' + lastMonth.length + '件';
+    var totalGuests = payouts.reduce(function(s, p) { return s + (p.guests_total || p.guests_adult || 0); }, 0);
+    var guestsWithData = payouts.filter(function(p) { return p.guests_total || p.guests_adult; });
+    var avgAdults = guestsWithData.length > 0 ? (guestsWithData.reduce(function(s, p) { return s + (p.guests_adult || 1); }, 0) / guestsWithData.length).toFixed(1) : 0;
+    document.getElementById('s-total-guests').textContent = totalGuests;
+    document.getElementById('s-avg-adults').textContent = '平均 ' + avgAdults + ' 人/組';
+  }
+
+  function openScan() {
+    document.getElementById('scan-modal').style.display = 'flex';
+    document.getElementById('scan-status').textContent = '準備中...';
+    document.getElementById('scan-detail').textContent = '';
+    document.getElementById('scan-btn').disabled = false;
+    document.getElementById('scan-btn').textContent = '実行する';
+  }
+  function closeScan() { document.getElementById('scan-modal').style.display = 'none'; }
+  function runScan() {
+    document.getElementById('scan-btn').disabled = true;
+    document.getElementById('scan-btn').textContent = '取込中...';
+    document.getElementById('scan-status').textContent = 'メール取得中...';
+    api('/arbnb/api/scan', {method: 'POST'}).then(function(res) { return res.json(); })
+      .then(function(data) {
+        if (data.error) {
+          document.getElementById('scan-status').textContent = 'エラー: ' + data.error;
+        } else {
+          document.getElementById('scan-status').textContent = '完了! ' + (data.imported||0) + '件';
+          document.getElementById('scan-detail').textContent = (data.skipped||0) + '件残り';
+          load();
+        }
+        document.getElementById('scan-btn').disabled = false;
+        document.getElementById('scan-btn').textContent = '実行する';
+      })
+      .catch(function(err) {
+        document.getElementById('scan-status').textContent = '通信エラー';
+        document.getElementById('scan-btn').disabled = false;
+        document.getElementById('scan-btn').textContent = '実行する';
+      });
+  }
+  function runScanGuests() {
+    document.getElementById('scan-modal').style.display = 'flex';
+    document.getElementById('scan-status').textContent = 'リマインダーーメール取得中...';
+    document.getElementById('scan-detail').textContent = '予約番号と照合中';
+    document.getElementById('scan-btn').disabled = true;
+    api('/arbnb/api/scan-reminders', {method: 'POST'}).then(function(res) { return res.json(); })
+      .then(function(data) {
+        if (data.error) {
+          document.getElementById('scan-status').textContent = 'エラー: ' + data.error;
+        } else {
+          document.getElementById('scan-status').textContent = '完了! ' + (data.updatedRecords||0) + '件のGuest数を更新';
+          document.getElementById('scan-detail').textContent = 'リマインダー ' + (data.remindersFound||0) + '件中';
+          load();
+        }
+        document.getElementById('scan-btn').disabled = false;
+        document.getElementById('scan-btn').textContent = '閉じる';
+      })
+      .catch(function(err) {
+        document.getElementById('scan-status').textContent = '通信エラー';
+        document.getElementById('scan-btn').disabled = false;
+        document.getElementById('scan-btn').textContent = '閉じる';
+      });
+  }
+  function openAdd() {
+    document.getElementById('add-modal').style.display = 'flex';
+    document.getElementById('add-error').style.display = 'none';
+    document.getElementById('add-form').reset();
+    var today = new Date().toISOString().split('T')[0];
+    document.querySelectorAll('#add-form input[type="date"]').forEach(function(f) { f.value = today; });
+  }
+  function closeAdd() { document.getElementById('add-modal').style.display = 'none'; }
+  function submitAdd(e) {
+    e.preventDefault();
+    var btn = document.getElementById('add-btn');
+    btn.disabled = true;
+    btn.textContent = '追加中...';
+    document.getElementById('add-error').style.display = 'none';
+    var fd = new FormData(document.getElementById('add-form'));
+    var body = {};
+    fd.forEach(function(v, k) { body[k] = v; });
+    api('/arbnb/api/payouts', {method: 'POST', body: JSON.stringify(body), headers: {'Authorization': authHeader, 'Content-Type': 'application/json'}})
+      .then(function(res) { return res.json(); })
+      .then(function(data) {
+        btn.disabled = false;
+        btn.textContent = '追加する';
+        if (data.error) {
+          document.getElementById('add-error').textContent = data.error;
+          document.getElementById('add-error').style.display = 'block';
+        } else {
+          closeAdd();
+          load();
+        }
+      })
+      .catch(function(err) {
+        btn.disabled = false;
+        btn.textContent = '追加する';
+        document.getElementById('add-error').textContent = '通信エラー: ' + err.message;
+        document.getElementById('add-error').style.display = 'block';
+      });
+  }
+
+  // Sync session with Bearer token, then load
+  fetch('/arbnb/api/me', { headers: { 'Authorization': authHeader }, credentials: 'include' })
+    .then(function(res) {
+      if (!res.ok) throw new Error('auth failed');
+      return res.json();
+    })
+    .catch(function() {
+      // Token invalid - remove and redirect
+      localStorage.removeItem('arbnb_token');
+      window.location.href = '/arbnb/login.html';
+      return Promise.reject('redirect');
+    })
+    .then(function() {
+      load();
+    });
+
+  load();
+})();
+</script>
+</body>
+</html>

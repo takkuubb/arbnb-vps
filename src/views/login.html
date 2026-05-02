@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>arbnb - Login</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,sans-serif;background:#f0f2f5;display:flex;justify-content:center;align-items:center;min-height:100vh}
+.card{background:white;padding:2.5rem;border-radius:16px;box-shadow:0 4px 20px rgba(0,0,0,0.1);width:100%;max-width:380px}
+.card h1{font-size:1.5rem;color:#FF5A5F;margin-bottom:0.25rem;text-align:center}
+.card p{color:#888;font-size:0.85rem;margin-bottom:2rem;text-align:center}
+.form-group{margin-bottom:1rem}
+.form-group label{display:block;font-size:0.8rem;color:#666;margin-bottom:0.4rem;font-weight:600}
+.form-group input{width:100%;padding:0.75rem;border:1px solid #ddd;border-radius:8px;font-size:1rem;outline:none;transition:border-color 0.2s}
+.form-group input:focus{border-color:#FF5A5F}
+.btn-login{width:100%;padding:0.85rem;background:#FF5A5F;color:white;border:none;border-radius:8px;font-size:1rem;font-weight:700;cursor:pointer;margin-top:0.5rem;transition:background 0.2s}
+.btn-login:hover{background:#e04e4e}
+.btn-login:disabled{background:#ccc;cursor:wait}
+.error{background:#fff0f0;color:#c0392b;padding:0.75rem;border-radius:8px;font-size:0.85rem;margin-bottom:1rem;display:none;text-align:center}
+</style>
+</head>
+<body>
+<div class="card">
+  <h1>&#x1F3E0; arbnb</h1>
+  <p>Airbnb payout 管理システム</p>
+  <div id="error" class="error"></div>
+  <form id="login-form">
+    <div class="form-group">
+      <label for="username">ユーザー名</label>
+      <input type="text" id="username" name="username" autocomplete="username" required>
+    </div>
+    <div class="form-group">
+      <label for="password">パスワード</label>
+      <input type="password" id="password" name="password" autocomplete="current-password" required>
+    </div>
+    <button type="submit" class="btn-login" id="btn">ログイン</button>
+  </form>
+</div>
+<script>
+(function(){
+  // If already logged in, redirect
+  if (localStorage.getItem('arbnb_token')) {
+    window.location.href = '/arbnb/dashboard.html';
+    return;
+  }
+
+  document.getElementById('login-form').onsubmit = function(e) {
+    e.preventDefault();
+    var btn = document.getElementById('btn');
+    var err = document.getElementById('error');
+    err.style.display = 'none';
+    btn.disabled = true;
+    btn.textContent = 'ログイン中...';
+
+    var username = document.getElementById('username').value;
+    var password = document.getElementById('password').value;
+
+    fetch('/arbnb/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username: username, password: password })
+    })
+    .then(function(res) { return res.json(); })
+    .then(function(data) {
+      btn.disabled = false;
+      btn.textContent = 'ログイン';
+      if (data.success) {
+        localStorage.setItem('arbnb_token', data.token);
+        window.location.href = '/arbnb/dashboard.html';
+      } else {
+        err.textContent = data.error || 'ログインに失敗しました';
+        err.style.display = 'block';
+      }
+    })
+    .catch(function(err2) {
+      btn.disabled = false;
+      btn.textContent = 'ログイン';
+      err.textContent = '通信エラー: ' + err2.message;
+      err.style.display = 'block';
+    });
+  };
+})();
+</script>
+</body>
+</html>

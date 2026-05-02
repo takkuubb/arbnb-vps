@@ -1,0 +1,10 @@
+const {getDb}=require('/var/www/arbnb/src/db');
+const db=getDb();
+const all=db.prepare('SELECT reservation_code,guest_name,guests_total FROM payouts WHERE stay_start>=? AND stay_start<=?').all('2026-04-01','2026-04-29');
+console.log('Total April:',all.length);
+const matched=all.filter(r=>r.guests_total&&r.guests_total>1);
+console.log('Matched (>1 guests):',matched.length);
+matched.forEach(r=>console.log('  MATCHED:',r.guest_name,r.reservation_code,r.guests_total+'人'));
+const unmatched=all.filter(r=>!r.guests_total||r.guests_total<=1);
+console.log('\nUnmatched (guests=1 or null):',unmatched.length);
+unmatched.forEach(r=>console.log(r.guest_name+' | '+r.reservation_code));

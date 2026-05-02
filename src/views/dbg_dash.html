@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html>
+<head><title>Debug API Test</title></head>
+<body>
+<pre id=out></pre>
+<script>
+const out = document.getElementById('out');
+async function log(msg) {
+  out.textContent += msg + '\n';
+  console.log(msg);
+}
+async function main() {
+  const token = localStorage.getItem('arbnb_token') || prompt('Token:');
+  if (!token) { log('No token'); return; }
+  const authHeader = 'Bearer ' + token;
+
+  // Test 1: /api/me
+  log('=== Test /api/me ===');
+  let r = await fetch('/arbnb/api/me', { headers: { Authorization: authHeader }, credentials: 'include' });
+  log('Status: ' + r.status);
+  let text = await r.text();
+  log('Body: ' + text.substring(0, 200));
+
+  // Test 2: /api/payouts default
+  log('\n=== Test /api/payouts (no sort) ===');
+  r = await fetch('/arbnb/api/payouts?limit=3', { headers: { Authorization: authHeader } });
+  log('Status: ' + r.status);
+  text = await r.text();
+  try {
+    let data = JSON.parse(text);
+    data.payouts.forEach(p => log(' ' + p.guest_name + ' ¥' + p.amount_value + ' | ' + p.nationality + ' | g:' + (p.guests_total ?? '—')));
+  } catch(e) { log('Error: ' + e.message + ' | ' + text.substring(0, 200)); }
+
+  // Test 3: /api/payouts with sort
+  log('\n=== Test /api/payouts?sort=amount_value_desc ===');
+  r = await fetch('/arbnb/api/payouts?sort=amount_value_desc&limit=3', { headers: { Authorization: authHeader } });
+  log('Status: ' + r.status);
+  text = await r.text();
+  try {
+    let data = JSON.parse(text);
+    data.payouts.forEach(p => log(' ' + p.guest_name + ' ¥' + p.amount_value + ' | ' + p.nationality + ' | g:' + (p.guests_total ?? '—')));
+  } catch(e) { log('Error: ' + e.message + ' | ' + text.substring(0, 200)); }
+
+  // Test 4: /api/payouts with guests_total sort
+  log('\n=== Test /api/payouts?sort=guests_total_desc ===');
+  r = await fetch('/arbnb/api/payouts?sort=guests_total_desc&limit=5', { headers: { Authorization: authHeader } });
+  log('Status: ' + r.status);
+  text = await r.text();
+  try {
+    let data = JSON.parse(text);
+    data.payouts.forEach(p => log(' ' + p.guest_name + ' g:' + (p.guests_total ?? '—') + ' | ' + p.nationality));
+  } catch(e) { log('Error: ' + e.message); }
+}
+main();
+</script>
+</body>
+</html>
