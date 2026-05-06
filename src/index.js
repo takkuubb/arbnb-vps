@@ -13,7 +13,30 @@ const BASE = '/arbnb';
 const VIEWS_DIR = path.join(__dirname, 'views');
 
 app.set('trust proxy', 1);
-app.use(express.json());
+
+// Custom JSON body parser - handles parse errors gracefully
+// This replaces express.json() and prevents crashes on malformed JSON
+app.use((req, res, next) => {
+  const ct = req.headers['content-type'] || '';
+  if (!ct.includes('application/json')) {
+    req.body = undefined;
+    return next();
+  }
+  let data = Buffer.from('');
+  req.on('data', chunk => { data = Buffer.concat([data, chunk]); });
+  req.on('end', () => {
+    if (!data.length) { req.body = undefined; return next(); }
+    try {
+      req.body = JSON.parse(data.toString());
+    } catch (e) {
+      console.error('[JSON Parse Error]', req.method, req.path, e.message.slice(0, 100));
+      return res.status(400).json({ error: 'Invalid JSON' });
+    }
+    next();
+  });
+  req.on('error', next);
+});
+
 app.use(express.urlencoded({ extended: true }));
 
 app.use(session({
@@ -22,8 +45,13 @@ app.use(session({
   saveUninitialized: false,
   name: 'arbnb.sid',
   cookie: { secure: false, httpOnly: true, maxAge: 7*24*60*60*1000 }
-  // Removed sameSite:'lax' - was blocking cookies on same-origin fetch over HTTPS
 }));
+
+// Catch all other errors
+app.use((err, req, res, next) => {
+  console.error('[Server Error]', err.message);
+  res.status(500).json({ error: 'Internal server error' });
+});
 
 app.use('/auth', authRouter);
 app.use('/api', apiRouter);
@@ -34,10 +62,14 @@ app.get('/login.html', (req, res) => {
   res.sendFile(path.join(VIEWS_DIR, 'login.html'));
 });
 
-// Static files (dashboard.html) are public - auth is handled client-side via Bearer token
-app.use(express.static(VIEWS_DIR));
-
-// API routes have their own requireAuth in routes/api.js
+// Static files (dashboard.html) - no-cache to prevent browser caching issues
+app.use(express.static(VIEWS_DIR, {
+  setHeaders: (res, path) => {
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
+  }
+}));
 
 // Root -> dashboard
 app.get('/', (req, res) => {

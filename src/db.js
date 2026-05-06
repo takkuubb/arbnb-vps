@@ -68,7 +68,7 @@ function getUserById(id) {
 }
 
 // Payout functions
-function getPayouts({ search = '', sort = 'payout_date', order = 'desc', limit = 500 } = {}) {
+function getPayouts({ search = '', sort = 'payout_date', order = 'desc', limit = 500, from = '', to = '' } = {}) {
   const allowedSorts = ['payout_date','amount_value','guest_name','nationality','nights','amount_per_night','created_at'];
   const s = allowedSorts.includes(sort) ? sort : 'payout_date';
   const o = order === 'asc' ? 'ASC' : 'DESC';
@@ -76,10 +76,22 @@ function getPayouts({ search = '', sort = 'payout_date', order = 'desc', limit =
 
   let query = 'SELECT * FROM payouts';
   const params = [];
+  const conditions = [];
   if (search && search.trim()) {
-    query += ' WHERE guest_name LIKE ? OR nationality LIKE ? OR listing_title LIKE ? OR reservation_code LIKE ?';
+    conditions.push('(guest_name LIKE ? OR nationality LIKE ? OR listing_title LIKE ? OR reservation_code LIKE ?)');
     const sw = '%' + search.trim() + '%';
     params.push(sw, sw, sw, sw);
+  }
+  if (from) {
+    conditions.push('payout_date >= ?');
+    params.push(from);
+  }
+  if (to) {
+    conditions.push('payout_date <= ?');
+    params.push(to);
+  }
+  if (conditions.length > 0) {
+    query += ' WHERE ' + conditions.join(' AND ');
   }
   // Numeric columns need CAST for correct ordering
   const numericCols = ['amount_value','nights','amount_per_night','guests_total','guests_adult','guests_child','guests_infant'];

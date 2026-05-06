@@ -50,11 +50,14 @@ tr:hover{background:#fafafa}
 </div>
 <div class="controls">
   <input type="text" id="search" placeholder="ゲスト名 / リスティング名 / 予約コード">
-  <select id="sort"><option value="payout_date_desc">支払日順（新しい順）</option><option value="payout_date_asc">支払日順（古い順）</option><option value="amount_desc">金額高い順</option><option value="amount_asc">金額低い順</option></select>
+  <input type="date" id="dateFrom" style="padding:8px 12px;border:1px solid #ddd;border-radius:8px;font-size:14px">
+  <span style="color:#888;line-height:38px">〜</span>
+  <input type="date" id="dateTo" style="padding:8px 12px;border:1px solid #ddd;border-radius:8px;font-size:14px">
   <select id="filter"><option value="">すべて</option><option value="japan">日本</option><option value="china">中国</option><option value="korea">韓国</option><option value="other">その他</option></select>
   <button class="btn-add" onclick="openAdd()">＋手動追加</button>
   <button class="btn-scan" onclick="openScan()">Gmail取込</button>
   <button class="btn-scan" onclick="runScanGuests()">Guest数取得</button>
+  <button class="btn-add" onclick="downloadCSV()">CSV出力</button>
 </div>
 <div class="table-wrap">
   <div id="loading">読み込み中...</div>
@@ -148,14 +151,57 @@ tr:hover{background:#fafafa}
     document.getElementById('s-avg-adults').textContent = total > 0 ? '平均 ' + (totalGuests / total).toFixed(1) + ' 人/組' : '平均 — 人/組';
   }
 
+
+  function escCSV(v) {
+    if (v == null) return '';
+    var s = String(v);
+    if (s.indexOf(',') >= 0 || s.indexOf('"') >= 0 || s.indexOf('\n') >= 0) {
+      return '"' + s.replace(/"/g, '""') + '"';
+    }
+    return s;
+  }
+
+  function downloadCSV() {
+    var rows = window._cachedPayouts || [];
+    if (rows.length === 0) { alert('データがありません'); return; }
+    var header = ['ゲスト名','大人','子供','赤ん坊','合計','国籍','泊数','滞在開始','滞在終了','リスティング','予約コード','金額','支払日'];
+    var lines = [header.join(',')];
+    rows.forEach(function(p) {
+      var nights = (p.stay_start && p.stay_end) ? Math.round((new Date(p.stay_end) - new Date(p.stay_start)) / 86400000) : (p.nights || 0);
+      lines.push([
+        escCSV(p.guest_name),
+        p.guests_adult || 0,
+        p.guests_child || 0,
+        p.guests_infant || 0,
+        p.guests_total || 0,
+        escCSV(p.nationality),
+        nights,
+        escCSV(p.stay_start ? p.stay_start.slice(0,10) : ''),
+        escCSV(p.stay_end ? p.stay_end.slice(0,10) : ''),
+        escCSV(p.listing_title),
+        escCSV(p.reservation_code),
+        p.amount_value || 0,
+        escCSV(p.payout_date ? p.payout_date.slice(0,10) : '')
+      ].join(','));
+    });
+    var blob = new Blob(['\uFEFF' + lines.join('\n')], { type: 'text/csv;charset=utf-8' });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url;
+    a.download = 'arbnb_payouts_' + new Date().toISOString().slice(0,10) + '.csv';
+    a.click();
+    URL.revokeObjectURL(url);
+  }
   function load() {
     var search = document.getElementById('search').value.trim();
-    var sort = document.getElementById('sort').value;
     var filter = document.getElementById('filter').value;
+    var dateFrom = document.getElementById('dateFrom').value;
+    var dateTo = document.getElementById('dateTo').value;
     var url = '/arbnb/api/payouts?limit=500';
     if (search) url += '&search=' + encodeURIComponent(search);
-    if (sort) url += '&sort=' + encodeURIComponent(sort);
     if (filter) url += '&filter=' + encodeURIComponent(filter);
+    if (dateFrom) url += '&from=' + encodeURIComponent(dateFrom);
+    if (dateTo) url += '&to=' + encodeURIComponent(dateTo);
 
     document.getElementById('loading').style.display = 'block';
     document.getElementById('table').style.display = 'none';
@@ -172,6 +218,7 @@ tr:hover{background:#fafafa}
         return;
       }
       document.getElementById('table').style.display = 'table';
+      window._cachedPayouts = data.payouts;
       render(data.payouts);
       updateStats(data.payouts);
     }).catch(function(err) {
@@ -180,12 +227,7 @@ tr:hover{background:#fafafa}
     });
   }
 
-  function setSort(sort) {
-    document.getElementById('sort').value = sort;
-    load();
-  }
-
-  function debouncedLoad() {
+    function debouncedLoad() {
     clearTimeout(window._debounceTimer);
     window._debounceTimer = setTimeout(load, 400);
   }
@@ -252,8 +294,10 @@ tr:hover{background:#fafafa}
   window.logout = logout;
 
   document.getElementById('search').addEventListener('input', debouncedLoad);
-  document.getElementById('sort').addEventListener('change', load);
-  document.getElementById('filter').addEventListener('change', load);
+  
+  document.getElementById('filter').addEventListener('change', debouncedLoad);
+  document.getElementById('dateFrom').addEventListener('change', debouncedLoad);
+  document.getElementById('dateTo').addEventListener('change', debouncedLoad);
 
   load();
 })();

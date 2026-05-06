@@ -39,4 +39,9 @@ router.post('/logout', (req, res) => {
   res.json({ success: true });
 });
 
+router.get('/logout', (req, res) => {
+  req.session.destroy();
+  res.send(`<!DOCTYPE html><html><head><meta charset=utf-8><title>Logging out...</title></head><body><script>localStorage.removeItem('arbnb_token');window.location.href='/arbnb/login.html';</script></body></html>`);
+});
+
 module.exports = router;

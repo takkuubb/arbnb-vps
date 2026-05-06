@@ -29,7 +29,7 @@ async function fetchPayoutEmails(maxResults = 30, startDate, endDate) {
     const body = getBody(full.data.payload);
     const parsed = parsePayoutEmail(getHeader('subject'), body);
     if (parsed && parsed.length > 0) {
-      for (const r of parsed) results.push({ ...r, emailId: msg.id, emailDate: getHeader('date') });
+      for (const r of parsed) results.push({ ...r, emailId: msg.id, emailDate: getHeader('date'), emailBody: body });
     }
   }
   return results;
@@ -62,7 +62,21 @@ async function savePayouts(emails) {
     if (!email.reservationCode) continue;
     const existing = db.prepare('SELECT id FROM payouts WHERE reservation_code = ?').get(email.reservationCode);
     if (existing) continue;
-    const amountValue = email.amount || 0;
+    let amountValue = email.amount || 0;
+    // Extract guest info from email body (applies to all guests in this email)
+    let guests_total = email.guests?.total || 1, guests_adult = email.guests?.adults || 1, guests_child = email.guests?.children || 0, guests_infant = email.guests?.infants || 0;
+    if (!email.guests && email.emailBody) {
+      const bodyText = email.emailBody.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ');
+      const totalMatch = bodyText.match(/([0-9]+)\s*guests?/i);
+      const adultMatch = bodyText.match(/([0-9]+)\s*adults?/i);
+      const childMatch = bodyText.match(/([0-9]+)\s*child(?:ren)?/i);
+      const infantMatch = bodyText.match(/([0-9]+)\s*infant[s]?/i);
+      if (totalMatch) guests_total = parseInt(totalMatch[1], 10);
+      if (adultMatch) guests_adult = parseInt(adultMatch[1], 10);
+      if (childMatch) guests_child = parseInt(childMatch[1], 10);
+      if (infantMatch) guests_infant = parseInt(infantMatch[1], 10);
+      if (!totalMatch && adultMatch) guests_total = guests_adult;
+    }
     const amountPerNight = email.nights > 0 ? Math.round(amountValue / email.nights) : 0;
     const amountOriginal = email.amountOriginal || ('\u00a5' + Number(amountValue).toLocaleString());
     const payoutDate = email.payoutDate || new Date().toISOString().split('T')[0];
@@ -77,10 +91,10 @@ async function savePayouts(emails) {
       amountOriginal,
       amountValue,
       amountPerNight,
-      email.guests?.total || 1,
-      email.guests?.adults || 1,
-      email.guests?.children || 0,
-      email.guests?.infants || 0,
+      guests_total,
+      guests_adult,
+      guests_child,
+      guests_infant,
       payoutDate,
       email.emailId || ''
     );
