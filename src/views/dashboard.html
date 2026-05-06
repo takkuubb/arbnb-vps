@@ -196,7 +196,7 @@ tr:hover{background:#fafafa}
   function openScan() {
     document.getElementById('scan-modal').style.display = 'flex';
     document.getElementById('scan-status').textContent = 'スキャン中...';
-    api('/arbnb/api/scan-gmail').then(function(r) { return r.json(); }).then(function(d) {
+    api('/api/scan').then(function(r) { return r.json(); }).then(function(d) {
       document.getElementById('scan-status').textContent = '完了: ' + (d.saved || 0) + ' 件取得';
     }).catch(function(e) {
       document.getElementById('scan-status').textContent = 'エラー: ' + e.message;
@@ -207,7 +207,7 @@ tr:hover{background:#fafafa}
     var btn = event.target;
     btn.textContent = '処理中...';
     btn.disabled = true;
-    api('/arbnb/api/scan-guests').then(function(r) { return r.json(); }).then(function(d) {
+    api('/api/scan-reminders').then(function(r) { return r.json(); }).then(function(d) {
       btn.textContent = 'Guest数取得';
       btn.disabled = false;
       load();
