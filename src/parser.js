@@ -62,7 +62,13 @@ function detectNationality(name) {
   const firstName = name.trim().split(/\u3000| /)[0];
   if (FIRST_NAME_MAP[firstName]) return FIRST_NAME_MAP[firstName];
   if (/[\u3040-\u309f\u30a0-\u30ff]/.test(name)) return 'Japan';
-  if (/[\u4e00-\u9fff]/.test(name)) return 'China';
+  if (/[\u4e00-\u9fff]/.test(name)) {
+    if (/[中国円的转计问题时间没有这里他们妈爸哈啊]/.test(name)) return 'China';
+    if (/[aeiou]{3,}/i.test(name) && /[bcdfghjklmnpqrstvwxyz]{2,}/i.test(name)) return 'China';
+    const chinaSurnames = /^(王|李|张|刘|陈|杨|黄|赵|周|吴|徐|孙|马|胡|朱|郭|何|高|林|罗|郑|梁|谢|宋|唐|许|韩|冯|邓|曹|彭|曾|萧|蔡|潘|田|董|袁|于|余|叶|程|傅|苏|魏|卢|蒋|杜|丁|沈|姜|范|江|金|雷|熊|秦|白|崔|康|孔|史|夏|侯|韦|贾|况|欧|龙|万|段|钱|龚|严|顾|孟|平|姬)/;
+    if (chinaSurnames.test(name)) return 'China';
+    return 'Japan';
+  }
   if (/Kasparavicius/i.test(name)) return 'Lithuania';
   if (/Ngati/i.test(name)) return 'Philippines';
   if (/[가-힯]/.test(name)) return 'Korea';
@@ -197,6 +203,7 @@ function parseGuestBlock(block, payoutDate) {
   const nights = calcNights(stayStart, stayEnd);
   const amountPerNight = nights > 0 ? Math.round(amount / nights) : 0;
   const nat = detectNationality(guestName);
+  const guests = parseGuestsFromBlock(block);
 
   return {
     reservationCode: resCode,
@@ -206,7 +213,25 @@ function parseGuestBlock(block, payoutDate) {
     stayStart, stayEnd,
     nights, amount, amountPerNight,
     payoutDate,
+    guests,
   };
+}
+
+function parseGuestsFromBlock(block) {
+  const text = block.replace(/\n/g, ' ').replace(/\s+/g, ' ');
+  // Patterns: "2 guests", "3 guests", "1 guest", "2 adults, 1 child", etc.
+  let total = 1, adults = 1, children = 0, infants = 0;
+  // "X guests" or "X adult(s)"
+  const gMatch = text.match(/([0-9]+)\s*guests?/i);
+  const aMatch = text.match(/([0-9]+)\s*adults?/i);
+  const cMatch = text.match(/([0-9]+)\s*child(?:ren)?/i);
+  const iMatch = text.match(/([0-9]+)\s*infant[s]?/i);
+  if (gMatch) total = parseInt(gMatch[1], 10) || 1;
+  if (aMatch) adults = parseInt(aMatch[1], 10) || 1;
+  if (cMatch) children = parseInt(cMatch[1], 10) || 0;
+  if (iMatch) infants = parseInt(iMatch[1], 10) || 0;
+  if (!gMatch && aMatch) total = adults;
+  return { total, adults, children, infants };
 }
 
 module.exports = { parsePayoutEmail };
