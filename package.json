@@ -8,6 +8,7 @@
     "init-user": "node src/scripts/init-user.js"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.98.0",
     "bcrypt": "^5.1.1",
     "better-sqlite3": "^9.4.3",
     "dotenv": "^16.4.5",

@@ -3,6 +3,7 @@ const db = require('../db');
 const gmail = require('../gmail');
 const { fetchReminderEmails } = require('../parse-reminder');
 const { verifyToken } = require('../tokens');
+const agent = require('../agent');
 
 const router = express.Router();
 
@@ -74,6 +75,23 @@ router.post('/payouts', requireAuth, (req, res) => {
   if (!guestName || !amountValue) return res.status(400).json({ error: '必須項目がありません' });
   const id = db.addPayout({ guestName, amountOriginal: '\\u00a5' + amountValue, amountValue, reservationCode: reservationCode || '', payoutDate: payoutDate || new Date().toISOString(), stayDetails: stayDetails || '', listingTitle: listingTitle || '' });
   res.json({ success: true, id });
+});
+
+router.post('/agent', requireAuth, async (req, res) => {
+  if (!process.env.ANTHROPIC_API_KEY) {
+    return res.status(503).json({ error: 'ANTHROPIC_API_KEY が設定されていません' });
+  }
+  const { message, history = [] } = req.body || {};
+  if (!message || typeof message !== 'string' || !message.trim()) {
+    return res.status(400).json({ error: 'message は必須です' });
+  }
+  try {
+    const reply = await agent.chat(history, message.trim());
+    res.json({ reply });
+  } catch (err) {
+    console.error('[Agent Error]', err.message);
+    res.status(500).json({ error: 'AIエージェントエラー: ' + err.message });
+  }
 });
 
 module.exports = router;
